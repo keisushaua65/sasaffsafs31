@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Word Counter</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(180deg, #006b5e 0%, #004d42 50%, #003d34 100%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    max-width: 480px;
+    margin: 0 auto;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Top stats panel */
+  .stats-panel {
+    background: #fff;
+    border-radius: 0 0 16px 16px;
+    padding: 12px 8px 10px;
+    z-index: 10;
+  }
+
+  .stats-row {
+    display: flex;
+    justify-content: space-around;
+    text-align: center;
+  }
+
+  .stat-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .stat-label {
+    font-size: 13px;
+    color: #555;
+    font-weight: 400;
+  }
+
+  .stat-value {
+    font-size: 22px;
+    font-weight: 600;
+    color: #111;
+    line-height: 1;
+  }
+
+  .stat-value.empty {
+    font-size: 22px;
+    color: #111;
+  }
+
+  /* Toolbar (shown when text is present) */
+  .toolbar {
+    display: none;
+    justify-content: space-around;
+    align-items: center;
+    padding: 10px 16px 4px;
+    border-top: 1px solid #eee;
+    margin-top: 8px;
+  }
+
+  .toolbar.visible {
+    display: flex;
+  }
+
+  .toolbar-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    position: relative;
+    color: #333;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .toolbar-btn .badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    background: #e53935;
+    color: #fff;
+    font-size: 8px;
+    font-weight: 700;
+    padding: 1px 3px;
+    border-radius: 3px;
+    letter-spacing: 0.3px;
+  }
+
+  .toolbar-btn .lock-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    font-size: 11px;
+  }
+
+  /* Text area */
+  .text-area-wrapper {
+    flex: 1;
+    padding: 14px 16px;
+    overflow-y: auto;
+  }
+
+  #editor {
+    width: 100%;
+    height: 100%;
+    min-height: 300px;
+    background: transparent;
+    border: none;
+    outline: none;
+    resize: none;
+    font-size: 16px;
+    color: #fff;
+    line-height: 1.5;
+    font-family: inherit;
+  }
+
+  #editor::placeholder {
+    color: rgba(255,255,255,0.75);
+    font-size: 16px;
+  }
+
+  /* Undo/Redo bar */
+  .undo-bar {
+    background: #f5a623;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 32px;
+  }
+
+  .undo-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #222;
+    font-size: 15px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .undo-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* Bottom nav */
+  .bottom-nav {
+    background: #fff;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 10px 8px 18px;
+    border-top: 1px solid #e0e0e0;
+  }
+
+  .nav-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 12px;
+    color: #555;
+    font-size: 11px;
+  }
+
+  .nav-btn svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .nav-btn.active-nav {
+    background: #f5a623;
+    border-radius: 24px;
+    padding: 8px 20px;
+    flex-direction: row;
+    gap: 6px;
+    color: #111;
+    font-size: 15px;
+    font-weight: 500;
+  }
+
+  .nav-btn.active-nav svg {
+    width: 20px;
+    height: 20px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Stats Panel -->
+<div class="stats-panel">
+  <div class="stats-row">
+    <div class="stat-item">
+      <span class="stat-label">Символы</span>
+      <span class="stat-value" id="chars">-</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Слова</span>
+      <span class="stat-value" id="words">-</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Предложения</span>
+      <span class="stat-value" id="sentences">-</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Абзацы</span>
+      <span class="stat-value" id="paragraphs">-</span>
+    </div>
+  </div>
+
+  <!-- Toolbar (visible when text entered) -->
+  <div class="toolbar" id="toolbar">
+    <button class="toolbar-btn" title="Меню">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <button class="toolbar-btn" title="Вставить">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+      <span class="lock-badge">🔒</span>
+    </button>
+    <button class="toolbar-btn" title="Добавить">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+    </button>
+    <button class="toolbar-btn" title="AI">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7z"/></svg>
+      <span class="badge">NEW</span>
+    </button>
+    <button class="toolbar-btn" title="Закрыть" id="clearBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- Text Area -->
+<div class="text-area-wrapper">
+  <textarea id="editor" placeholder="Введите текст"></textarea>
+</div>
+
+<!-- Undo/Redo Bar -->
+<div class="undo-bar">
+  <button class="undo-btn" id="undoBtn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 10h10a5 5 0 0 1 0 10H9"/><polyline points="3 6 3 10 7 10"/></svg>
+    Отменить
+  </button>
+  <button class="undo-btn" id="redoBtn">
+    Redo
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 10H11a5 5 0 0 0 0 10h4"/><polyline points="21 6 21 10 17 10"/></svg>
+  </button>
+</div>
+
+<!-- Bottom Nav -->
+<div class="bottom-nav">
+  <button class="nav-btn active-nav" id="navInput">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    Ввод
+  </button>
+  <button class="nav-btn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></svg>
+  </button>
+  <button class="nav-btn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+  </button>
+  <button class="nav-btn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
+</div>
+
+<script>
+  const editor = document.getElementById('editor');
+  const toolbar = document.getElementById('toolbar');
+  const clearBtn = document.getElementById('clearBtn');
+
+  // Undo/Redo history
+  let history = [''];
+  let historyIndex = 0;
+  let isUndoRedo = false;
+
+  function updateStats() {
+    const text = editor.value;
+    const hasText = text.trim().length > 0;
+
+    // Chars
+    document.getElementById('chars').textContent = hasText ? text.length : '-';
+
+    // Words
+    const words = hasText ? text.trim().split(/\s+/).filter(w => w.length > 0) : [];
+    document.getElementById('words').textContent = hasText ? words.length : '-';
+
+    // Sentences
+    const sentences = hasText ? text.split(/[.!?]+/).filter(s => s.trim().length > 0) : [];
+    document.getElementById('sentences').textContent = hasText ? sentences.length : '-';
+
+    // Paragraphs
+    const paragraphs = hasText ? text.split(/\n+/).filter(p => p.trim().length > 0) : [];
+    document.getElementById('paragraphs').textContent = hasText ? paragraphs.length : '-';
+
+    // Toolbar
+    toolbar.classList.toggle('visible', hasText);
+  }
+
+  editor.addEventListener('input', () => {
+    updateStats();
+    if (!isUndoRedo) {
+      history = history.slice(0, historyIndex + 1);
+      history.push(editor.value);
+      historyIndex = history.length - 1;
+    }
+  });
+
+  clearBtn.addEventListener('click', () => {
+    editor.value = '';
+    updateStats();
+    history.push('');
+    historyIndex = history.length - 1;
+  });
+
+  document.getElementById('undoBtn').addEventListener('click', () => {
+    if (historyIndex > 0) {
+      historyIndex--;
+      isUndoRedo = true;
+      editor.value = history[historyIndex];
+      isUndoRedo = false;
+      updateStats();
+    }
+  });
+
+  document.getElementById('redoBtn').addEventListener('click', () => {
+    if (historyIndex < history.length - 1) {
+      historyIndex++;
+      isUndoRedo = true;
+      editor.value = history[historyIndex];
+      isUndoRedo = false;
+      updateStats();
+    }
+  });
+</script>
+</body>
+</html>
